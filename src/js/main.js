@@ -10,7 +10,8 @@ const state = {
     locationQuery: '',
     jobs: [],
     selectedJob: null,
-    pendingCount: 0
+    pendingCount: 0,
+    currentView: 'jobs'
 };
 
 // --- Initialization ---
@@ -195,7 +196,6 @@ document.getElementById('post-job-form').onsubmit = async (e) => {
         submitBtn.textContent = 'Submitting...';
 
         if (navigator.onLine) {
-            // Directly post to server
             const response = await fetch(`${API_BASE_URL}/jobs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -207,9 +207,9 @@ document.getElementById('post-job-form').onsubmit = async (e) => {
                 throw new Error(errData.error || 'Server error');
             }
 
+            await db.queueJobSubmission({ ...jobData, synced: true });
             showToast('Job submitted for review! ✅ It will appear once approved.');
         } else {
-            // Queue for offline sync
             await db.queueJobSubmission(jobData);
             showToast('Job saved offline! 📋 Will submit automatically when online.');
         }
@@ -392,13 +392,51 @@ function showToast(message) {
 
 // --- Event Listeners ---
 
-document.getElementById('sync-now-btn').onclick = () => {
-    trySyncApplications();
-};
+function setupEventListeners() {
+    document.getElementById('sync-now-btn').onclick = () => {
+        trySyncApplications();
+    };
 
-document.getElementById('job-sync-now-btn').onclick = () => {
-    trySyncJobSubmissions();
-};
+    document.getElementById('job-sync-now-btn').onclick = () => {
+        trySyncJobSubmissions();
+    };
+
+    document.getElementById('job-title-search').oninput = (e) => {
+        state.titleQuery = e.target.value;
+        renderJobs();
+    };
+
+    document.getElementById('job-location-search').oninput = (e) => {
+        state.locationQuery = e.target.value;
+        renderJobs();
+    };
+
+    document.querySelectorAll('.filter-chip').forEach(chip => {
+        chip.onclick = () => {
+            document.querySelector('.filter-chip.active').classList.remove('active');
+            chip.classList.add('active');
+            state.currentFilter = chip.dataset.filter;
+            renderJobs();
+        };
+    });
+
+    document.getElementById('my-jobs-btn').onclick = () => {
+        state.currentView = 'myJobs';
+        document.getElementById('hero-section').classList.add('hidden');
+        document.getElementById('filter-section').classList.add('hidden');
+        document.getElementById('job-list-section').classList.add('hidden');
+        document.getElementById('my-jobs-section').classList.remove('hidden');
+        renderMyJobs();
+    };
+
+    document.getElementById('back-to-jobs-btn').onclick = () => {
+        state.currentView = 'jobs';
+        document.getElementById('hero-section').classList.remove('hidden');
+        document.getElementById('filter-section').classList.remove('hidden');
+        document.getElementById('job-list-section').classList.remove('hidden');
+        document.getElementById('my-jobs-section').classList.add('hidden');
+    };
+}
 
 window.addEventListener('online', () => {
     updateConnectionStatus();
@@ -407,24 +445,35 @@ window.addEventListener('online', () => {
 });
 window.addEventListener('offline', updateConnectionStatus);
 
-document.getElementById('job-title-search').oninput = (e) => {
-    state.titleQuery = e.target.value;
-    renderJobs();
-};
+async function renderMyJobs() {
+    const myJobsList = document.getElementById('my-jobs-list');
+    const postedJobs = await db.getAllJobSubmissions();
 
-document.getElementById('job-location-search').oninput = (e) => {
-    state.locationQuery = e.target.value;
-    renderJobs();
-};
+    if (postedJobs.length === 0) {
+        myJobsList.innerHTML = '<div class="empty-state"><p>You haven\'t posted any jobs yet. Click "+ Post a Job" to get started!</p></div>';
+        return;
+    }
 
-document.querySelectorAll('.filter-chip').forEach(chip => {
-    chip.onclick = () => {
-        document.querySelector('.filter-chip.active').classList.remove('active');
-        chip.classList.add('active');
-        state.currentFilter = chip.dataset.filter;
-        renderJobs();
-    };
+    myJobsList.innerHTML = postedJobs.map(job => `
+        <div class="job-card ${job.synced ? '' : 'pending-sync'}">
+            <div class="job-status-badge ${job.synced ? 'synced' : 'pending'}">
+                ${job.synced ? '✓ Submitted' : '⏳ Pending Sync'}
+            </div>
+            <span class="company">${job.company}</span>
+            <h3>${job.title}</h3>
+            <div class="job-meta">
+                <span class="tag">${job.location}</span>
+                <span class="tag">${job.type}</span>
+            </div>
+            <div class="job-footer">
+                <span class="salary">${job.salary || 'Not specified'}</span>
+                <span class="timestamp">Posted ${new Date(job.timestamp).toLocaleDateString()}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setupEventListeners();
+    initApp();
 });
-
-// Start the app
-document.addEventListener('DOMContentLoaded', initApp);

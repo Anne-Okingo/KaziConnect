@@ -128,6 +128,15 @@ class KaziDB {
         });
     }
 
+    async getAllJobSubmissions() {
+        return new Promise((resolve) => {
+            const tx = this.db.transaction('jobSubmissions', 'readonly');
+            const store = tx.objectStore('jobSubmissions');
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+        });
+    }
+
     async markJobSubmissionSynced(id) {
         const tx = this.db.transaction('jobSubmissions', 'readwrite');
         const store = tx.objectStore('jobSubmissions');

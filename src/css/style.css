@@ -650,3 +650,101 @@ nav {
         height: 200px;
     }
 }
+
+/* My Jobs Button */
+.my-jobs-btn {
+    background: #f59e0b;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.my-jobs-btn:hover {
+    background: #d97706;
+    transform: translateY(-1px);
+}
+
+/* My Jobs Section */
+#my-jobs-section {
+    max-width: 1200px;
+    margin: 4rem auto 6rem;
+    padding: 0 2rem;
+}
+
+#my-jobs-section .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.back-btn {
+    background: var(--text-dark);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.back-btn:hover {
+    transform: translateX(-4px);
+}
+
+/* Job Status Badge */
+.job-status-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.job-status-badge.synced {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.job-status-badge.pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.job-card {
+    position: relative;
+}
+
+.job-card.pending-sync {
+    border: 2px dashed #fbbf24;
+    background: #fffbeb;
+}
+
+.job-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.5rem;
+}
+
+.timestamp {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-muted);
+}
+
+.empty-state p {
+    font-size: 1.1rem;
+}
