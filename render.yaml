@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: kaziconnect
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /opt/render/project/src/data
+    disk:
+      name: kaziconnect-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1

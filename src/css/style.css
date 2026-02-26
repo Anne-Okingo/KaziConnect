@@ -96,6 +96,25 @@ nav {
     transform: translateY(-1px);
 }
 
+/* Post a Job nav button */
+.post-job-nav-btn {
+    background: linear-gradient(135deg, #7c3aed, #4c1d95);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.post-job-nav-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(124, 58, 237, 0.45);
+}
+
 .status-badge {
     font-size: 0.75rem;
     font-weight: 700;
@@ -310,8 +329,27 @@ nav {
     border-radius: 12px;
 }
 
-#sync-banner.hidden {
+#sync-banner.hidden,
+#job-sync-banner.hidden {
     display: none;
+}
+
+#job-sync-banner {
+    background: #f5f3ff;
+    border: 1px solid #c4b5fd;
+    padding: 1rem 2rem;
+    margin: 1rem auto;
+    max-width: 1200px;
+    border-radius: 12px;
+}
+
+#job-sync-banner .sync-info {
+    background: none;
+    color: #4c1d95;
+}
+
+#job-sync-banner .sync-icon {
+    color: #7c3aed;
 }
 
 .sync-info {
@@ -496,10 +534,32 @@ nav {
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
     border-color: var(--primary-mint);
     background: white;
     box-shadow: 0 0 0 4px rgba(66, 185, 131, 0.1);
+}
+
+.form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.2s;
+    background: #fcfcfc;
+    appearance: none;
+    cursor: pointer;
+}
+
+/* Two-column form layout */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
 }
 
 .modal-footer {

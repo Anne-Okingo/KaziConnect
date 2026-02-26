@@ -1,9 +1,10 @@
 const DB_NAME = 'KaziConnectDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 /**
  * Handles all IndexedDB operations for KaziConnect.
- * Stores jobs for offline viewing and applications for background sync.
+ * Stores jobs for offline viewing, applications for background sync,
+ * and job submissions for employer offline-first posting.
  */
 class KaziDB {
     constructor() {
@@ -28,14 +29,20 @@ class KaziDB {
                     }
                 }
 
-                // Version 2: Settings and versioning
+                // Version 2: Settings
                 if (oldVersion < 2) {
                     if (!db.objectStoreNames.contains('settings')) {
                         const settingsStore = db.createObjectStore('settings', { keyPath: 'key' });
-                        // Default settings
-                        settingsStore.add({ key: 'syncFrequency', value: 'normal' }); // normal, low, high
+                        settingsStore.add({ key: 'syncFrequency', value: 'normal' });
                         settingsStore.add({ key: 'batteryAware', value: true });
                         settingsStore.add({ key: 'dataSaver', value: false });
+                    }
+                }
+
+                // Version 3: Job Submissions for employer offline posting
+                if (oldVersion < 3) {
+                    if (!db.objectStoreNames.contains('jobSubmissions')) {
+                        db.createObjectStore('jobSubmissions', { keyPath: 'id', autoIncrement: true });
                     }
                 }
             };
@@ -93,9 +100,37 @@ class KaziDB {
     }
 
     async markAsSynced(id) {
-        // Instead of deleting, we could mark as synced, but for simplicity we'll delete
         const tx = this.db.transaction('applications', 'readwrite');
         const store = tx.objectStore('applications');
+        store.delete(id);
+        return new Promise((resolve) => tx.oncomplete = resolve);
+    }
+
+    // --- Job Submission Operations (Employer offline posting) ---
+
+    async queueJobSubmission(job) {
+        const tx = this.db.transaction('jobSubmissions', 'readwrite');
+        const store = tx.objectStore('jobSubmissions');
+        store.add({
+            ...job,
+            timestamp: Date.now(),
+            synced: false
+        });
+        return new Promise((resolve) => tx.oncomplete = resolve);
+    }
+
+    async getPendingJobSubmissions() {
+        return new Promise((resolve) => {
+            const tx = this.db.transaction('jobSubmissions', 'readonly');
+            const store = tx.objectStore('jobSubmissions');
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result.filter(j => !j.synced));
+        });
+    }
+
+    async markJobSubmissionSynced(id) {
+        const tx = this.db.transaction('jobSubmissions', 'readwrite');
+        const store = tx.objectStore('jobSubmissions');
         store.delete(id);
         return new Promise((resolve) => tx.oncomplete = resolve);
     }

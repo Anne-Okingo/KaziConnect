@@ -28,6 +28,7 @@
             </ul>
             <div class="nav-actions">
                 <button class="signin-btn">Sign-in</button>
+                <button id="post-job-btn" class="post-job-nav-btn">+ Post a Job</button>
                 <div id="connection-status" class="status-badge online">Online</div>
             </div>
         </nav>
@@ -94,6 +95,15 @@
             </div>
         </section>
 
+        <!-- Pending Job Submissions Banner -->
+        <section id="job-sync-banner" class="hidden">
+            <div class="sync-info" style="background: linear-gradient(135deg, #7c3aed, #4c1d95);">
+                <span class="sync-icon">📋</span>
+                <span id="job-sync-message">You have 0 pending job posts. They will sync when online.</span>
+                <button id="job-sync-now-btn" class="sync-btn-mini">Sync Now</button>
+            </div>
+        </section>
+
         <!-- Filters Section -->
         <section id="filter-section">
             <div class="filters">
@@ -151,10 +161,55 @@
         </div>
     </div>
 
-    <!-- Application Success Toast -->
-    <div id="toast" class="toast hidden">
-        Application saved locally! It will be submitted when you have internet.
+    <!-- Post Job Modal -->
+    <div id="post-job-modal" class="modal hidden">
+        <div class="modal-content">
+            <button class="close-modal" id="close-post-job-modal">&times;</button>
+            <h2 style="margin-bottom: 0.25rem;">Post a Job</h2>
+            <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1.5rem;">Your listing will be reviewed before going live. Offline? We'll save it and post automatically.</p>
+            <form id="post-job-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="job-title-input">Job Title *</label>
+                        <input type="text" id="job-title-input" placeholder="e.g. Farm Manager" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="job-company-input">Company / Organisation *</label>
+                        <input type="text" id="job-company-input" placeholder="e.g. Siaya Coop" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="job-location-input">Location *</label>
+                        <input type="text" id="job-location-input" placeholder="e.g. Kisumu" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="job-type-input">Job Type *</label>
+                        <select id="job-type-input" required>
+                            <option value="" disabled selected>Select type...</option>
+                            <option value="urban">Urban</option>
+                            <option value="rural">Rural</option>
+                            <option value="remote">Remote</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="job-salary-input">Salary / Pay</label>
+                    <input type="text" id="job-salary-input" placeholder="e.g. KES 30,000">
+                </div>
+                <div class="form-group">
+                    <label for="job-description-input">Job Description</label>
+                    <textarea id="job-description-input" rows="4" placeholder="Describe the role, skills required, and any other details..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" id="post-job-submit-btn" class="submit-btn">Submit Job Listing</button>
+                </div>
+            </form>
+        </div>
     </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
 
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>

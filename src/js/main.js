@@ -9,6 +9,7 @@ const state = {
     titleQuery: '',
     locationQuery: '',
     jobs: [],
+    selectedJob: null,
     pendingCount: 0
 };
 
@@ -18,7 +19,7 @@ async function initApp() {
     try {
         await db.init();
 
-        // Check if we have jobs, if not and online, fetch them from API
+        // Check if we have jobs; if not and online, fetch from API
         const localJobs = await db.getAllJobs();
         if (localJobs.length === 0 && navigator.onLine) {
             console.log('Fetching initial jobs from server...');
@@ -37,6 +38,7 @@ async function initApp() {
 
         updateConnectionStatus();
         updatePendingSyncBanner();
+        updateJobSyncBanner();
 
         // Register Service Worker
         if ('serviceWorker' in navigator) {
@@ -48,12 +50,12 @@ async function initApp() {
         // Background Sync Setup (if supported)
         if ('SyncManager' in window && navigator.onLine) {
             trySyncApplications();
+            trySyncJobSubmissions();
         }
 
     } catch (err) {
         console.error('App init failed:', err);
     } finally {
-        // ALWAYS render (even if empty) to clear "Loading..." state
         renderJobs();
     }
 }
@@ -67,7 +69,6 @@ function renderJobs() {
         const matchesTitle = job.title.toLowerCase().includes(state.titleQuery.toLowerCase()) ||
             job.company.toLowerCase().includes(state.titleQuery.toLowerCase());
         const matchesLocation = job.location.toLowerCase().includes(state.locationQuery.toLowerCase());
-
         return matchesFilter && matchesTitle && matchesLocation;
     });
 
@@ -122,9 +123,10 @@ document.querySelector('.close-modal').onclick = () => {
     document.getElementById('job-modal').classList.add('hidden');
 };
 
+// --- Application Form ---
+
 document.getElementById('job-application-form').onsubmit = async (e) => {
     e.preventDefault();
-    console.log('Form Submit Triggered');
     if (!state.selectedJob) return;
 
     const application = {
@@ -145,20 +147,79 @@ document.getElementById('job-application-form').onsubmit = async (e) => {
 
         await db.queueApplication(application);
 
-        // Optimistic UI: Act as if it worked immediately
-        showToast(navigator.onLine ? 'Application sent!' : 'Saved offline! Will sync later.');
+        showToast(navigator.onLine ? 'Application sent! ✅' : 'Saved offline! Will sync when online. 📶');
 
         updatePendingSyncBanner();
         document.getElementById('job-modal').classList.add('hidden');
         document.getElementById('job-application-form').reset();
 
-        // Trigger sync in background
         if (navigator.onLine) {
             trySyncApplications();
         }
     } catch (err) {
         console.error('Failed to save application:', err);
         showToast('Error saving application.');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
+    }
+};
+
+// --- Post Job Modal ---
+
+document.getElementById('post-job-btn').onclick = () => {
+    document.getElementById('post-job-modal').classList.remove('hidden');
+};
+
+document.getElementById('close-post-job-modal').onclick = () => {
+    document.getElementById('post-job-modal').classList.add('hidden');
+};
+
+document.getElementById('post-job-form').onsubmit = async (e) => {
+    e.preventDefault();
+
+    const jobData = {
+        title: document.getElementById('job-title-input').value.trim(),
+        company: document.getElementById('job-company-input').value.trim(),
+        location: document.getElementById('job-location-input').value.trim(),
+        type: document.getElementById('job-type-input').value,
+        salary: document.getElementById('job-salary-input').value.trim(),
+        description: document.getElementById('job-description-input').value.trim()
+    };
+
+    const submitBtn = document.getElementById('post-job-submit-btn');
+    const originalBtnText = submitBtn.textContent;
+
+    try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+
+        if (navigator.onLine) {
+            // Directly post to server
+            const response = await fetch(`${API_BASE_URL}/jobs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(jobData)
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Server error');
+            }
+
+            showToast('Job submitted for review! ✅ It will appear once approved.');
+        } else {
+            // Queue for offline sync
+            await db.queueJobSubmission(jobData);
+            showToast('Job saved offline! 📋 Will submit automatically when online.');
+        }
+
+        updateJobSyncBanner();
+        document.getElementById('post-job-modal').classList.add('hidden');
+        document.getElementById('post-job-form').reset();
+    } catch (err) {
+        console.error('Failed to submit job:', err);
+        showToast('Error submitting job. Please try again.');
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = originalBtnText;
@@ -175,18 +236,20 @@ async function updateConnectionStatus() {
         status.textContent = 'Online';
         status.className = 'status-badge online';
 
-        // Register for Background Sync if supported
         if ('serviceWorker' in navigator && 'SyncManager' in window) {
             const registration = await navigator.serviceWorker.ready;
             try {
                 await registration.sync.register('sync-applications');
+                await registration.sync.register('sync-jobs');
                 console.log('Background Sync registered');
             } catch (err) {
                 console.warn('Background Sync registration failed, falling back to manual', err);
                 trySyncApplications();
+                trySyncJobSubmissions();
             }
         } else {
             trySyncApplications();
+            trySyncJobSubmissions();
         }
     } else {
         status.textContent = 'Offline';
@@ -209,13 +272,25 @@ async function updatePendingSyncBanner() {
     }
 }
 
+async function updateJobSyncBanner() {
+    const banner = document.getElementById('job-sync-banner');
+    const msg = document.getElementById('job-sync-message');
+    const pending = await db.getPendingJobSubmissions();
+
+    if (pending.length > 0) {
+        banner.classList.remove('hidden');
+        msg.textContent = `You have ${pending.length} pending job post(s). They will sync automatically when online.`;
+    } else {
+        banner.classList.add('hidden');
+    }
+}
+
 async function trySyncApplications(retryCount = 0) {
     if (!navigator.onLine) return;
 
     const pending = await db.getPendingApplications();
     if (pending.length === 0) return;
 
-    // Battery & Data Awareness (Hackathon Bonus)
     const isBatteryLow = 'getBattery' in navigator ? (await navigator.getBattery()).level < 0.15 : false;
     const isDataSaver = navigator.connection ? navigator.connection.saveData : false;
 
@@ -225,15 +300,13 @@ async function trySyncApplications(retryCount = 0) {
         return;
     }
 
-    console.log(`Syncing ${pending.length} applications (Attempt ${retryCount + 1}) to server...`);
+    console.log(`Syncing ${pending.length} application(s) (Attempt ${retryCount + 1})...`);
 
     for (const app of pending) {
         try {
             const response = await fetch(`${API_BASE_URL}/applications`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     jobId: app.jobId,
                     jobTitle: app.jobTitle,
@@ -248,22 +321,64 @@ async function trySyncApplications(retryCount = 0) {
                 throw new Error(errorData.error || 'Server error');
             }
 
-            console.log(`Successfully synced application for ${app.jobTitle}`);
+            console.log(`Synced application for: ${app.jobTitle}`);
             await db.markAsSynced(app.id);
         } catch (err) {
             console.error('Failed to sync application:', err);
-
-            // Exponential Backoff (Hackathon Criterion)
             if (retryCount < 3) {
                 const delay = Math.pow(2, retryCount) * 1000;
                 console.log(`Retrying in ${delay / 1000}s...`);
                 setTimeout(() => trySyncApplications(retryCount + 1), delay);
             }
-            break; // Stop current loop and wait for retry
+            break;
         }
     }
 
     updatePendingSyncBanner();
+}
+
+async function trySyncJobSubmissions(retryCount = 0) {
+    if (!navigator.onLine) return;
+
+    const pending = await db.getPendingJobSubmissions();
+    if (pending.length === 0) return;
+
+    console.log(`Syncing ${pending.length} pending job submission(s) (Attempt ${retryCount + 1})...`);
+
+    for (const job of pending) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/jobs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: job.title,
+                    company: job.company,
+                    location: job.location,
+                    type: job.type,
+                    salary: job.salary,
+                    description: job.description
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Server error');
+            }
+
+            console.log(`Synced job submission: ${job.title}`);
+            await db.markJobSubmissionSynced(job.id);
+        } catch (err) {
+            console.error('Failed to sync job submission:', err);
+            if (retryCount < 3) {
+                const delay = Math.pow(2, retryCount) * 1000;
+                console.log(`Retrying in ${delay / 1000}s...`);
+                setTimeout(() => trySyncJobSubmissions(retryCount + 1), delay);
+            }
+            break;
+        }
+    }
+
+    updateJobSyncBanner();
 }
 
 let toastTimeout;
@@ -278,11 +393,18 @@ function showToast(message) {
 // --- Event Listeners ---
 
 document.getElementById('sync-now-btn').onclick = () => {
-    console.log('Manual sync requested');
     trySyncApplications();
 };
 
-window.addEventListener('online', updateConnectionStatus);
+document.getElementById('job-sync-now-btn').onclick = () => {
+    trySyncJobSubmissions();
+};
+
+window.addEventListener('online', () => {
+    updateConnectionStatus();
+    trySyncApplications();
+    trySyncJobSubmissions();
+});
 window.addEventListener('offline', updateConnectionStatus);
 
 document.getElementById('job-title-search').oninput = (e) => {
@@ -303,9 +425,6 @@ document.querySelectorAll('.filter-chip').forEach(chip => {
         renderJobs();
     };
 });
-
-window.addEventListener('online', updateConnectionStatus);
-window.addEventListener('offline', updateConnectionStatus);
 
 // Start the app
 document.addEventListener('DOMContentLoaded', initApp);
